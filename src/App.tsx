@@ -22,7 +22,7 @@ import { soundEffects } from './services/soundEffects';
 import { voiceService } from './services/voiceService';
 import { storageService } from './services/storageService';
 import { themeService, HudTheme } from './services/themeService';
-import { Send, Mic, MicOff, Terminal } from 'lucide-react';
+import { Send, Mic, MicOff, Terminal, AlertTriangle, X } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 
 export default function App() {
@@ -113,13 +113,15 @@ export default function App() {
     setStatus('idle');
   };
 
-  // Toggle voice recognition
+  const [voiceAlert, setVoiceAlert] = useState<{ message: string; type: 'warning' | 'info' } | null>(null);
+
+  // Toggle voice recognition & neural audio recording
   const toggleListening = () => {
     if (isListening) {
       voiceService.stopListening();
       setIsListening(false);
       setStatus('idle');
-      soundEffects.playChirp();
+      soundEffects.playConfirm();
       return;
     }
 
@@ -127,14 +129,17 @@ export default function App() {
       stopSpeaking();
     }
 
+    setVoiceAlert(null);
     soundEffects.playStartup();
     setIsListening(true);
     setStatus('listening');
 
     voiceService.startListening(
       (transcript, isFinal) => {
-        setInputText(transcript);
-        if (isFinal && transcript.trim().length > 0) {
+        if (transcript) {
+          setInputText(transcript);
+        }
+        if (isFinal && transcript.trim().length > 0 && transcript !== 'JARVIS dekodiert Audiosignal...') {
           setIsListening(false);
           setStatus('idle');
           handleSendMessage(transcript.trim());
@@ -144,6 +149,8 @@ export default function App() {
         console.warn('Speech error:', error);
         setIsListening(false);
         setStatus('idle');
+        setVoiceAlert({ type: 'warning', message: error });
+        soundEffects.playWarning();
       },
       () => {
         setIsListening(false);
@@ -414,6 +421,40 @@ export default function App() {
 
         {/* Bottom Input Console */}
         <div className="shrink-0 pt-2">
+          {/* Voice Warning Banner */}
+          {voiceAlert && (
+            <div className="mb-2 p-2.5 rounded-lg border border-amber-500/50 bg-amber-950/40 text-amber-200 text-xs font-mono flex items-center justify-between gap-2 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>{voiceAlert.message}</span>
+              </div>
+              <button
+                onClick={() => setVoiceAlert(null)}
+                className="p-1 text-slate-400 hover:text-slate-100"
+                title="Hinweis schließen"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Active Audio Recording Indicator */}
+          {isListening && (
+            <div className="mb-2 p-2 rounded-lg border border-amber-500/50 bg-amber-950/40 text-amber-200 text-xs font-mono flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                <span className="font-bold">SPRACHAUFNAHME AKTIV: Sprechen Sie Ihren Befehl...</span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleListening}
+                className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] transition-colors"
+              >
+                STOPPEN & SENDEN
+              </button>
+            </div>
+          )}
+
           <form
             onSubmit={(e) => {
               e.preventDefault();

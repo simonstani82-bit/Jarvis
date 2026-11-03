@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
 
 // Initialize Google GenAI client (User-Agent header required by AI Studio guidelines)
 const ai = new GoogleGenAI({
@@ -328,6 +328,58 @@ app.get('/api/health', (req, res) => {
     version: 'Mark LXXXV',
     geminiKeyConfigured: !!process.env.GEMINI_API_KEY,
   });
+});
+
+// Audio Transcription Endpoint using Gemini
+app.post('/api/agent/transcribe', async (req, res) => {
+  try {
+    const { audioData, mimeType } = req.body;
+    if (!audioData) {
+      return res.status(400).json({ error: 'Keine Audiodaten übermittelt.' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.json({ text: '' });
+    }
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-transcribe',
+        contents: [
+          {
+            inlineData: {
+              mimeType: mimeType || 'audio/webm',
+              data: audioData,
+            },
+          },
+          {
+            text: 'Transkribiere diese Audiosprachaufnahme auf Deutsch. Gib ausschließlich den transkribierten Text ohne Anführungszeichen, Metadaten oder Begrüßung zurück.',
+          },
+        ],
+      });
+      return res.json({ text: (response.text || '').trim() });
+    } catch (modelErr: any) {
+      console.warn('gemini-3.5-transcribe fallback to gemini-3.8-flash:', modelErr.message);
+      const fallback = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: [
+          {
+            inlineData: {
+              mimeType: mimeType || 'audio/webm',
+              data: audioData,
+            },
+          },
+          {
+            text: 'Transkribiere diese Audiosprachaufnahme auf Deutsch. Gib ausschließlich den gesprochenen Text zurück.',
+          },
+        ],
+      });
+      return res.json({ text: (fallback.text || '').trim() });
+    }
+  } catch (err: any) {
+    console.error('Transcription endpoint error:', err);
+    res.status(500).json({ error: 'Transkriptionsfehler: ' + (err.message || 'Unbekannt') });
+  }
 });
 
 // Primary Agent Chat Endpoint

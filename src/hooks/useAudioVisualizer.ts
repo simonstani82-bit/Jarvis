@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { voiceService } from '../services/voiceService';
 
 export interface AudioVisualizerState {
   frequencies: number[]; // 16 normalized frequency bins (0.05 to 1.0)
@@ -17,45 +18,60 @@ export function useAudioVisualizer(isListening: boolean, isSpeaking: boolean): A
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const attachedStreamRef = useRef<MediaStream | null>(null);
 
-  // Setup / teardown microphone audio analyzer when isListening changes
+  // Monitor voiceService.getActiveMediaStream() when listening
   useEffect(() => {
-    let active = true;
+    let checkInterval: any = null;
 
     if (isListening) {
-      if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ audio: true })
-          .then((stream) => {
-            if (!active) {
-              stream.getTracks().forEach((t) => t.stop());
-              return;
-            }
-            micStreamRef.current = stream;
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-            const ctx = new AudioContextClass();
-            audioCtxRef.current = ctx;
+      const attachStream = (stream: MediaStream) => {
+        try {
+          if (attachedStreamRef.current === stream && analyserRef.current) return;
+          attachedStreamRef.current = stream;
 
-            const source = ctx.createMediaStreamSource(stream);
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 64; // 32 frequency bins
-            analyser.smoothingTimeConstant = 0.75;
-            source.connect(analyser);
-            analyserRef.current = analyser;
-            setIsLiveMicActive(true);
-          })
-          .catch((err) => {
-            console.warn('Microphone access for visualizer:', err.message);
-            setIsLiveMicActive(false);
-          });
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          const ctx = new AudioContextClass();
+          audioCtxRef.current = ctx;
+
+          const source = ctx.createMediaStreamSource(stream);
+          sourceNodeRef.current = source;
+
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 64;
+          analyser.smoothingTimeConstant = 0.75;
+          source.connect(analyser);
+          analyserRef.current = analyser;
+          setIsLiveMicActive(true);
+        } catch (e) {
+          console.warn('AudioVisualizer attach stream error:', e);
+          setIsLiveMicActive(false);
+        }
+      };
+
+      // Check immediately and poll until stream is acquired by voiceService
+      const stream = voiceService.getActiveMediaStream();
+      if (stream) {
+        attachStream(stream);
+      } else {
+        checkInterval = setInterval(() => {
+          const s = voiceService.getActiveMediaStream();
+          if (s) {
+            attachStream(s);
+            clearInterval(checkInterval);
+          }
+        }, 150);
       }
     } else {
       setIsLiveMicActive(false);
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
+      attachedStreamRef.current = null;
+      if (sourceNodeRef.current) {
+        try {
+          sourceNodeRef.current.disconnect();
+        } catch {}
+        sourceNodeRef.current = null;
       }
       if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
         audioCtxRef.current.close().catch(() => {});
@@ -65,16 +81,19 @@ export function useAudioVisualizer(isListening: boolean, isSpeaking: boolean): A
     }
 
     return () => {
-      active = false;
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
+      if (checkInterval) clearInterval(checkInterval);
+      if (sourceNodeRef.current) {
+        try {
+          sourceNodeRef.current.disconnect();
+        } catch {}
+        sourceNodeRef.current = null;
       }
       if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
         audioCtxRef.current.close().catch(() => {});
         audioCtxRef.current = null;
       }
       analyserRef.current = null;
+      attachedStreamRef.current = null;
     };
   }, [isListening]);
 
@@ -84,14 +103,14 @@ export function useAudioVisualizer(isListening: boolean, isSpeaking: boolean): A
 
     const updateFrame = () => {
       if (isListening && analyserRef.current) {
-        // Real microphone frequency data
+        // Real microphone frequency data from voiceService shared stream
         analyserRef.current.getByteFrequencyData(dataArray);
 
         let sum = 0;
         const newFreqs: number[] = [];
         for (let i = 0; i < 16; i++) {
           const raw = dataArray[i] / 255;
-          const val = Math.max(0.1, Math.min(1.0, raw * 1.3)); // Boost slightly for high visual responsiveness
+          const val = Math.max(0.1, Math.min(1.0, raw * 1.35));
           newFreqs.push(val);
           sum += raw;
         }
@@ -99,7 +118,6 @@ export function useAudioVisualizer(isListening: boolean, isSpeaking: boolean): A
         const avg = sum / 16;
         const dB = avg > 0.01 ? Math.round(20 * Math.log10(avg)) : -60;
 
-        // Generate 24 radial points mirrored from the 16 bins for symmetry
         const newRadial: number[] = [];
         for (let j = 0; j < 24; j++) {
           const idx = j < 12 ? j : 23 - j;
@@ -111,13 +129,12 @@ export function useAudioVisualizer(isListening: boolean, isSpeaking: boolean): A
         setFrequencies(newFreqs);
         setRadialBars(newRadial);
       } else if (isSpeaking) {
-        // Realistic synthetic speech vocal cadence harmonics
+        // Speech synthesis vocal cadence harmonics
         const time = performance.now() * 0.008;
         const newFreqs: number[] = [];
         let sum = 0;
 
         for (let i = 0; i < 16; i++) {
-          // Multitonal syllabic resonance: vowels formants + consonant noise
           const baseSyllable = Math.sin(time * 2.2 + i * 0.5) * 0.35;
           const harmonic = Math.cos(time * 3.8 - i * 0.3) * 0.25;
           const jitter = (Math.sin(time * 12 + i) + 1) * 0.12;
@@ -140,17 +157,17 @@ export function useAudioVisualizer(isListening: boolean, isSpeaking: boolean): A
         setFrequencies(newFreqs);
         setRadialBars(newRadial);
       } else if (isListening) {
-        // Fallback when mic permission is loading/denied
+        // Listening waiting for mic initial sound
         const time = performance.now() * 0.005;
         const newFreqs = Array.from({ length: 16 }, (_, i) => 
-          Math.max(0.1, 0.2 + Math.sin(time * 3 + i * 0.6) * 0.2)
+          Math.max(0.1, 0.22 + Math.sin(time * 3 + i * 0.6) * 0.18)
         );
-        setAmplitude(0.25);
-        setDecibels(-28);
+        setAmplitude(0.22);
+        setDecibels(-30);
         setFrequencies(newFreqs);
         setRadialBars(newFreqs.slice(0, 12).concat(newFreqs.slice(0, 12).reverse()));
       } else {
-        // Idle state: subtle pulsing resting breath
+        // Idle gentle breathing state
         const time = performance.now() * 0.002;
         const newFreqs = Array.from({ length: 16 }, (_, i) => 
           0.1 + Math.sin(time + i * 0.4) * 0.04

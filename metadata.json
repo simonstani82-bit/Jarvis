@@ -1,0 +1,6 @@
+{
+  "name": "JARVIS - Personal AI Agent",
+  "description": "Futuristischer persönlicher KI-Agent mit Iron-Man-HUD, Sprachsteuerung, autonomer Aufgabenplanung und Tool-Ausführung.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

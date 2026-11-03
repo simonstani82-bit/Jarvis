@@ -21,9 +21,14 @@ import { TelemetryDrawer } from './components/TelemetryDrawer';
 import { soundEffects } from './services/soundEffects';
 import { voiceService } from './services/voiceService';
 import { storageService } from './services/storageService';
-import { Send, Mic, MicOff, Sparkles, Terminal } from 'lucide-react';
+import { themeService, HudTheme } from './services/themeService';
+import { Send, Mic, MicOff, Terminal } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 
 export default function App() {
+  // Theme state dynamically controlling CSS root variables
+  const [currentTheme, setCurrentTheme] = useState<HudTheme>(() => themeService.initTheme());
+
   const [messages, setMessages] = useState<Message[]>(() => {
     const saved = storageService.getChatHistory();
     if (saved && saved.length > 0) return saved;
@@ -62,6 +67,12 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Initialize theme on initial load
+  useEffect(() => {
+    const applied = themeService.initTheme();
+    setCurrentTheme(applied);
+  }, []);
+
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,6 +82,11 @@ export default function App() {
     scrollToBottom();
     storageService.saveChatHistory(messages);
   }, [messages]);
+
+  // Handle theme changes
+  const handleThemeChange = (newTheme: HudTheme) => {
+    setCurrentTheme(newTheme);
+  };
 
   // Handle voice speech output
   const speakMessage = (text: string) => {
@@ -142,7 +158,7 @@ export default function App() {
 
     for (const tc of toolCalls) {
       if (tc.name === 'save_memory' && tc.args?.key && tc.args?.value) {
-        const updated = storageService.saveMemory(tc.args.key, tc.args.value, tc.args.category || 'fact');
+        storageService.saveMemory(tc.args.key, tc.args.value, tc.args.category || 'fact');
         setMemories(storageService.getMemories());
       } else if (tc.name === 'add_note' && tc.args?.title && tc.args?.content) {
         storageService.addNote({
@@ -338,10 +354,15 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col relative overflow-hidden select-text">
-      {/* Background HUD scanlines and ambient radial aura */}
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col relative overflow-hidden select-text transition-colors duration-500">
+      {/* Background HUD scanlines and ambient dynamic radial aura */}
       <div className="fixed inset-0 hud-scanlines pointer-events-none z-10" />
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-cyan-600/5 blur-[120px] rounded-full pointer-events-none" />
+      <div
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-[850px] h-[420px] blur-[130px] rounded-full pointer-events-none transition-all duration-700"
+        style={{
+          backgroundColor: currentTheme.dim,
+        }}
+      />
 
       {/* Stark Industries HUD Header */}
       <HudHeader
@@ -351,6 +372,8 @@ export default function App() {
         onResetChat={handleResetChat}
         isTelemetryOpen={isTelemetryOpen}
         memoryCount={memories.length}
+        currentTheme={currentTheme}
+        onThemeChange={handleThemeChange}
       />
 
       {/* Main HUD Viewport */}
@@ -368,14 +391,16 @@ export default function App() {
 
         {/* Chat Message Scroll Feed */}
         <div className="flex-1 overflow-y-auto px-1 sm:px-2 py-2 space-y-2 min-h-[220px]">
-          {messages.map((msg) => (
-            <ChatMessage
-              key={msg.id}
-              message={msg}
-              onConfirmAction={handleConfirmAction}
-              onSpeak={speakMessage}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                onConfirmAction={handleConfirmAction}
+                onSpeak={speakMessage}
+              />
+            ))}
+          </AnimatePresence>
           <div ref={messagesEndRef} />
         </div>
 
@@ -394,10 +419,10 @@ export default function App() {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="relative flex items-center gap-2 p-1.5 sm:p-2 rounded-xl hud-box border-cyan-500/40 bg-slate-950/80 shadow-[0_0_20px_rgba(0,240,255,0.08)]"
+            className="relative flex items-center gap-2 p-1.5 sm:p-2 rounded-xl hud-box border-[var(--hud-border)] bg-slate-950/85 shadow-[0_0_20px_var(--hud-dim)] transition-all"
           >
             {/* Terminal prompt symbol */}
-            <div className="hidden sm:flex items-center pl-2 text-cyan-400">
+            <div className="hidden sm:flex items-center pl-2 text-[var(--hud-primary)]">
               <Terminal className="w-4 h-4" />
             </div>
 
@@ -412,7 +437,7 @@ export default function App() {
                   : 'Sprechen oder tippen Sie Ihren Befehl für JARVIS...'
               }
               disabled={status === 'thinking' || status === 'planning'}
-              className="flex-1 bg-transparent px-3 py-2 text-sm text-cyan-100 placeholder-cyan-500/40 focus:outline-none font-sans"
+              className="flex-1 bg-transparent px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none font-sans"
             />
 
             {/* Microphone Toggle Button */}
@@ -422,7 +447,7 @@ export default function App() {
               className={`p-2.5 rounded-lg border transition-all ${
                 isListening
                   ? 'border-amber-400 bg-amber-500/30 text-amber-200 shadow-[0_0_15px_#f59e0b]'
-                  : 'border-cyan-500/30 bg-cyan-950/40 text-cyan-300 hover:text-cyan-100 hover:border-cyan-400'
+                  : 'border-[var(--hud-border)] bg-[var(--hud-accent-bg)] text-[var(--hud-primary)] hover:border-[var(--hud-primary)]'
               }`}
               title={isListening ? 'Zuhören beenden' : 'Spracheingabe starten'}
             >
@@ -437,14 +462,14 @@ export default function App() {
             <button
               type="submit"
               disabled={!inputText.trim() || status === 'thinking' || status === 'planning'}
-              className="px-4 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs font-bold transition-all shadow-[0_0_15px_rgba(0,240,255,0.4)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-lg bg-[var(--hud-primary)] hover:opacity-90 text-slate-950 font-mono text-xs font-bold transition-all shadow-[0_0_15px_var(--hud-dim)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
               <Send className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">SENDEN</span>
             </button>
           </form>
-          <div className="flex items-center justify-between px-2 pt-1 text-[10px] font-mono text-cyan-500/50">
-            <span>STARK PROTOKOLLE // DEUTSCH</span>
+          <div className="flex items-center justify-between px-2 pt-1 text-[10px] font-mono text-slate-400">
+            <span className="text-[var(--hud-primary)]/80">{currentTheme.badge}</span>
             <span>ENTER ZUM ABSENDEN // MIKROFON FÜR SPRACHE</span>
           </div>
         </div>
@@ -458,6 +483,9 @@ export default function App() {
         calendarEvents={calendarEvents}
         notes={notes}
         reminders={reminders}
+        currentTheme={currentTheme}
+        isWorking={status === 'thinking' || status === 'planning' || status === 'executing_tool'}
+        onThemeChange={handleThemeChange}
         onAddMemory={(key, value, category) => {
           storageService.saveMemory(key, value, category);
           setMemories(storageService.getMemories());

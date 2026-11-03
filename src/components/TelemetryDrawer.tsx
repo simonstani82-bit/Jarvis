@@ -4,13 +4,11 @@ import {
   Brain,
   Calendar,
   CheckSquare,
-  Bell,
   Activity,
-  Plus,
   Trash2,
   Check,
-  ShieldCheck,
   Info,
+  Palette,
 } from 'lucide-react';
 import {
   CalendarEvent,
@@ -19,6 +17,8 @@ import {
   MemoryItem,
 } from '../types/jarvis';
 import { soundEffects } from '../services/soundEffects';
+import { HUD_THEMES, HudTheme, themeService } from '../services/themeService';
+import { DiagnosticsChart } from './DiagnosticsChart';
 
 interface TelemetryDrawerProps {
   isOpen: boolean;
@@ -27,6 +27,9 @@ interface TelemetryDrawerProps {
   calendarEvents: CalendarEvent[];
   notes: NoteItem[];
   reminders: ReminderItem[];
+  currentTheme: HudTheme;
+  isWorking?: boolean;
+  onThemeChange: (theme: HudTheme) => void;
   onAddMemory: (key: string, value: string, category: MemoryItem['category']) => void;
   onDeleteMemory: (id: string) => void;
   onAddCalendarEvent: (event: Omit<CalendarEvent, 'id'>) => void;
@@ -43,6 +46,9 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
   calendarEvents,
   notes,
   reminders,
+  currentTheme,
+  isWorking = false,
+  onThemeChange,
   onAddMemory,
   onDeleteMemory,
   onAddCalendarEvent,
@@ -63,16 +69,16 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm transition-opacity">
-      <div className="relative w-full max-w-lg h-full bg-slate-950/95 border-l border-cyan-500/30 flex flex-col shadow-[-10px_0_30px_rgba(0,240,255,0.15)] font-sans">
+      <div className="relative w-full max-w-lg h-full bg-slate-950/95 border-l border-[var(--hud-border)] flex flex-col shadow-[-10px_0_30px_var(--hud-dim)] font-sans transition-colors duration-300">
         {/* Header */}
-        <div className="p-4 border-b border-cyan-500/20 flex items-center justify-between bg-slate-900/60">
+        <div className="p-4 border-b border-[var(--hud-border)] flex items-center justify-between bg-slate-900/60">
           <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-cyan-400 animate-pulse" />
+            <Activity className="w-5 h-5 text-[var(--hud-primary)] animate-pulse" />
             <div>
-              <h2 className="hud-title text-sm font-bold text-cyan-200">
+              <h2 className="hud-title text-sm font-bold text-slate-100">
                 TELEMETRIE & DATEN-CORE
               </h2>
-              <p className="text-[10px] text-cyan-400/60 font-mono">
+              <p className="text-[10px] text-[var(--hud-primary)]/70 font-mono">
                 INTERNE SPEICHER & SUBSYSTEME
               </p>
             </div>
@@ -82,14 +88,14 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
               soundEffects.playChirp();
               onClose();
             }}
-            className="p-1.5 rounded border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors"
+            className="p-1.5 rounded border border-slate-700 hover:border-[var(--hud-primary)] text-slate-400 hover:text-[var(--hud-primary)] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-cyan-500/20 text-xs font-mono bg-slate-900/40">
+        <div className="flex border-b border-[var(--hud-border)] text-xs font-mono bg-slate-900/40">
           <button
             onClick={() => {
               soundEffects.playChirp();
@@ -97,7 +103,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
             }}
             className={`flex-1 py-3 px-2 flex items-center justify-center gap-1.5 border-b-2 transition-all ${
               activeTab === 'memory'
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/30 font-bold'
+                ? 'border-[var(--hud-primary)] text-[var(--hud-primary)] bg-[var(--hud-accent-bg)] font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -111,7 +117,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
             }}
             className={`flex-1 py-3 px-2 flex items-center justify-center gap-1.5 border-b-2 transition-all ${
               activeTab === 'calendar'
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/30 font-bold'
+                ? 'border-[var(--hud-primary)] text-[var(--hud-primary)] bg-[var(--hud-accent-bg)] font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -125,7 +131,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
             }}
             className={`flex-1 py-3 px-2 flex items-center justify-center gap-1.5 border-b-2 transition-all ${
               activeTab === 'notes'
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/30 font-bold'
+                ? 'border-[var(--hud-primary)] text-[var(--hud-primary)] bg-[var(--hud-accent-bg)] font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -139,7 +145,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
             }}
             className={`flex-1 py-3 px-2 flex items-center justify-center gap-1.5 border-b-2 transition-all ${
               activeTab === 'system'
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/30 font-bold'
+                ? 'border-[var(--hud-primary)] text-[var(--hud-primary)] bg-[var(--hud-accent-bg)] font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -153,14 +159,14 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
           {/* TAB 1: MEMORY */}
           {activeTab === 'memory' && (
             <div className="space-y-4">
-              <div className="p-3 rounded border border-cyan-500/20 bg-cyan-950/20 text-xs text-cyan-300/80 font-mono leading-relaxed">
-                <Info className="w-4 h-4 text-cyan-400 inline mr-1.5" />
+              <div className="p-3 rounded border border-[var(--hud-border)] bg-[var(--hud-accent-bg)] text-xs text-slate-300 font-mono leading-relaxed">
+                <Info className="w-4 h-4 text-[var(--hud-primary)] inline mr-1.5" />
                 JARVIS nutzt dieses Langzeitgedächtnis bei jeder Anfrage, um Vorlieben, Anrede und persönliche Fakten zu berücksichtigen.
               </div>
 
               {/* Add Memory Form */}
-              <div className="p-3 rounded border border-cyan-500/30 bg-slate-900/60 space-y-2">
-                <span className="text-[11px] font-mono text-cyan-400 font-bold uppercase">
+              <div className="p-3 rounded border border-[var(--hud-border)] bg-slate-900/60 space-y-2">
+                <span className="text-[11px] font-mono text-[var(--hud-primary)] font-bold uppercase">
                   Neuen Eintrag einprägen:
                 </span>
                 <input
@@ -168,14 +174,14 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
                   placeholder="Schlagwort (z. B. Projektziel)"
                   value={newMemKey}
                   onChange={(e) => setNewMemKey(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-[var(--hud-primary)]"
                 />
                 <input
                   type="text"
                   placeholder="Wert (z. B. Deadline am 15. November)"
                   value={newMemVal}
                   onChange={(e) => setNewMemVal(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-[var(--hud-primary)]"
                 />
                 <button
                   onClick={() => {
@@ -186,7 +192,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
                       setNewMemVal('');
                     }
                   }}
-                  className="w-full py-1.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-slate-950 font-mono text-xs font-bold transition-all shadow-[0_0_10px_rgba(0,240,255,0.3)]"
+                  className="w-full py-1.5 rounded bg-[var(--hud-primary)] hover:opacity-90 text-slate-950 font-mono text-xs font-bold transition-all shadow-[0_0_10px_var(--hud-dim)]"
                 >
                   IM GEDÄCHTNIS VERANKERN
                 </button>
@@ -197,14 +203,14 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
                 {memories.map((m) => (
                   <div
                     key={m.id}
-                    className="p-3 rounded border border-cyan-500/20 bg-cyan-950/30 flex items-start justify-between gap-2 group hover:border-cyan-400/50 transition-colors"
+                    className="p-3 rounded border border-[var(--hud-border)] bg-[var(--hud-accent-bg)] flex items-start justify-between gap-2 group hover:border-[var(--hud-primary)] transition-colors"
                   >
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-xs font-bold text-cyan-300">
+                        <span className="font-mono text-xs font-bold text-[var(--hud-primary)]">
                           {m.key}
                         </span>
-                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-cyan-900/60 text-cyan-400 border border-cyan-500/30 font-mono">
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 border border-[var(--hud-border)] font-mono">
                           {m.category}
                         </span>
                       </div>
@@ -231,14 +237,14 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
           {/* TAB 2: CALENDAR */}
           {activeTab === 'calendar' && (
             <div className="space-y-3">
-              <div className="p-3 rounded border border-cyan-500/20 bg-cyan-950/20 text-xs text-cyan-300/80 font-mono">
+              <div className="p-3 rounded border border-[var(--hud-border)] bg-[var(--hud-accent-bg)] text-xs text-slate-300 font-mono">
                 Termine werden von JARVIS über das Kalender-Tool synchronisiert und abgefragt.
               </div>
               <div className="space-y-2">
                 {calendarEvents.map((evt) => (
                   <div
                     key={evt.id}
-                    className="p-3 rounded border border-cyan-500/20 bg-cyan-950/30 flex items-start justify-between"
+                    className="p-3 rounded border border-[var(--hud-border)] bg-[var(--hud-accent-bg)] flex items-start justify-between"
                   >
                     <div>
                       <div className="flex items-center gap-2 font-mono text-xs text-amber-300 font-bold mb-1">
@@ -274,8 +280,8 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
           {activeTab === 'notes' && (
             <div className="space-y-3">
               {/* Quick Add Note */}
-              <div className="p-3 rounded border border-cyan-500/30 bg-slate-900/60 space-y-2">
-                <span className="text-[11px] font-mono text-cyan-400 font-bold uppercase">
+              <div className="p-3 rounded border border-[var(--hud-border)] bg-slate-900/60 space-y-2">
+                <span className="text-[11px] font-mono text-[var(--hud-primary)] font-bold uppercase">
                   Schnellnotiz hinzufügen:
                 </span>
                 <input
@@ -283,14 +289,14 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
                   placeholder="Titel"
                   value={newNoteTitle}
                   onChange={(e) => setNewNoteTitle(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-[var(--hud-primary)]"
                 />
                 <textarea
                   placeholder="Notizinhalt..."
                   rows={2}
                   value={newNoteContent}
                   onChange={(e) => setNewNoteContent(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 resize-none"
+                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-[var(--hud-primary)] resize-none"
                 />
                 <button
                   onClick={() => {
@@ -305,7 +311,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
                       setNewNoteContent('');
                     }
                   }}
-                  className="w-full py-1.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-slate-950 font-mono text-xs font-bold transition-all"
+                  className="w-full py-1.5 rounded bg-[var(--hud-primary)] hover:opacity-90 text-slate-950 font-mono text-xs font-bold transition-all shadow-[0_0_10px_var(--hud-dim)]"
                 >
                   NOTIZ SPEICHERN
                 </button>
@@ -319,7 +325,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
                     className={`p-3 rounded border transition-colors flex items-start gap-3 ${
                       note.completed
                         ? 'border-slate-800 bg-slate-900/40 text-slate-500'
-                        : 'border-cyan-500/20 bg-cyan-950/30 text-slate-200'
+                        : 'border-[var(--hud-border)] bg-[var(--hud-accent-bg)] text-slate-200'
                     }`}
                   >
                     <button
@@ -330,7 +336,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
                       className={`w-5 h-5 rounded border mt-0.5 flex items-center justify-center transition-colors ${
                         note.completed
                           ? 'border-emerald-500 bg-emerald-950 text-emerald-400'
-                          : 'border-cyan-500/40 hover:border-cyan-400'
+                          : 'border-[var(--hud-border)] hover:border-[var(--hud-primary)]'
                       }`}
                     >
                       {note.completed && <Check className="w-3.5 h-3.5" />}
@@ -338,7 +344,7 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
                     <div className="flex-1">
                       <h4
                         className={`text-xs font-bold ${
-                          note.completed ? 'line-through text-slate-500' : 'text-cyan-200'
+                          note.completed ? 'line-through text-slate-500' : 'text-slate-100'
                         }`}
                       >
                         {note.title}
@@ -363,33 +369,84 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
             </div>
           )}
 
-          {/* TAB 4: SYSTEM DIAGNOSTICS */}
+          {/* TAB 4: SYSTEM DIAGNOSTICS & THEMES */}
           {activeTab === 'system' && (
-            <div className="space-y-3 font-mono text-xs">
-              <div className="p-3 rounded border border-cyan-500/20 bg-slate-900/60 space-y-2 text-cyan-300">
-                <div className="flex justify-between border-b border-cyan-500/10 pb-1.5">
+            <div className="space-y-4 font-mono text-xs">
+              {/* Real-time System Diagnostics Recharts Widget */}
+              <DiagnosticsChart
+                currentTheme={currentTheme}
+                isWorking={isWorking}
+              />
+
+              {/* Color Scheme Quick Chooser in Diagnostics */}
+              <div className="p-3 rounded border border-[var(--hud-border)] bg-slate-900/60 space-y-2.5">
+                <div className="flex items-center gap-1.5 text-[var(--hud-primary)] font-bold text-xs uppercase">
+                  <Palette className="w-4 h-4" />
+                  <span>HUD FARBSCHEMATA (DYNAMISCHE CSS-ROOTS)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {HUD_THEMES.map((theme) => {
+                    const isSelected = theme.id === currentTheme.id;
+                    return (
+                      <button
+                        key={theme.id}
+                        onClick={() => {
+                          soundEffects.playStartup();
+                          const applied = themeService.applyTheme(theme.id);
+                          onThemeChange(applied);
+                        }}
+                        className={`p-2 rounded border text-left flex items-center gap-2 transition-all ${
+                          isSelected
+                            ? 'border-[var(--hud-primary)] bg-[var(--hud-accent-bg)] shadow-[0_0_10px_var(--hud-dim)]'
+                            : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+                        }`}
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full shrink-0"
+                          style={{
+                            backgroundColor: theme.primary,
+                            boxShadow: `0 0 6px ${theme.primary}`,
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <span className={`block font-bold truncate text-[11px] ${isSelected ? 'text-[var(--hud-primary)]' : 'text-slate-200'}`}>
+                            {theme.name}
+                          </span>
+                          <span className="text-[9px] text-slate-400 truncate block">
+                            {theme.primary}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Telemetry Status */}
+              <div className="p-3 rounded border border-[var(--hud-border)] bg-slate-900/60 space-y-2 text-slate-300">
+                <div className="flex justify-between border-b border-[var(--hud-border)]/50 pb-1.5">
+                  <span className="text-slate-400">Aktives Protokoll:</span>
+                  <span className="font-bold text-[var(--hud-primary)]">{currentTheme.name}</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--hud-border)]/50 pb-1.5">
                   <span className="text-slate-400">Core Neural Engine:</span>
                   <span className="font-bold">Gemini 3.8 Flash (Multimodal)</span>
                 </div>
-                <div className="flex justify-between border-b border-cyan-500/10 pb-1.5">
+                <div className="flex justify-between border-b border-[var(--hud-border)]/50 pb-1.5">
                   <span className="text-slate-400">Agenten-Architektur:</span>
                   <span className="text-emerald-400">Function Calling + Multiturn Loop</span>
                 </div>
-                <div className="flex justify-between border-b border-cyan-500/10 pb-1.5">
+                <div className="flex justify-between border-b border-[var(--hud-border)]/50 pb-1.5">
                   <span className="text-slate-400">Sicherheits-Gate:</span>
                   <span className="text-amber-400">Human-in-the-Loop Bestätigung</span>
                 </div>
-                <div className="flex justify-between border-b border-cyan-500/10 pb-1.5">
-                  <span className="text-slate-400">Sprachausgabe:</span>
-                  <span className="text-cyan-300">Web Speech Synthesis (de-DE)</span>
-                </div>
-                <div className="flex justify-between border-b border-cyan-500/10 pb-1.5">
-                  <span className="text-slate-400">Spracherkennung:</span>
-                  <span className="text-cyan-300">Web Speech Recognition (de-DE)</span>
+                <div className="flex justify-between border-b border-[var(--hud-border)]/50 pb-1.5">
+                  <span className="text-slate-400">CSS Root Dynamik:</span>
+                  <span className="text-emerald-400">--hud-primary: {currentTheme.primary}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Audio-Synthesizer:</span>
-                  <span className="text-cyan-300">Web Audio API (Synthetisch)</span>
+                  <span className="text-[var(--hud-primary)]">Web Audio API (Synthetisch)</span>
                 </div>
               </div>
             </div>

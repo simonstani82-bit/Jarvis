@@ -2,9 +2,17 @@
 
 @layer base {
   :root {
-    --hud-cyan: #00f0ff;
-    --hud-cyan-dim: rgba(0, 240, 255, 0.2);
-    --hud-cyan-glow: rgba(0, 240, 255, 0.45);
+    /* Default HUD Theme: Classic Cyan */
+    --hud-primary: #00f0ff;
+    --hud-primary-rgb: 0, 240, 255;
+    --hud-secondary: #0ea5e9;
+    --hud-secondary-rgb: 14, 165, 233;
+    --hud-glow: rgba(0, 240, 255, 0.55);
+    --hud-dim: rgba(0, 240, 255, 0.15);
+    --hud-border: rgba(0, 240, 255, 0.35);
+    --hud-card-bg: rgba(6, 15, 30, 0.75);
+    --hud-accent-bg: rgba(0, 240, 255, 0.08);
+
     --hud-gold: #fbbf24;
     --hud-danger: #ef4444;
   }
@@ -14,6 +22,7 @@
     letter-spacing: 0.025em;
     background-color: #030712;
     color: #e2e8f0;
+    transition: background-color 0.4s ease, color 0.4s ease;
   }
 
   h1, h2, h3, .hud-title {
@@ -25,7 +34,7 @@
   }
 }
 
-/* Custom HUD Scrollbar */
+/* Custom HUD Scrollbar using dynamic theme */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -34,42 +43,44 @@
   background: rgba(3, 7, 18, 0.8);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.25);
+  background: var(--hud-border);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 240, 255, 0.6);
+  background: var(--hud-primary);
 }
 
-/* Scanlines background overlay */
+/* Scanlines background overlay using dynamic theme */
 .hud-scanlines {
   background: linear-gradient(
     rgba(18, 16, 16, 0) 50%, 
-    rgba(0, 240, 255, 0.025) 50%
+    rgba(var(--hud-primary-rgb), 0.035) 50%
   ), linear-gradient(
     90deg,
     rgba(255, 0, 0, 0.01),
-    rgba(0, 255, 0, 0.005),
+    rgba(var(--hud-primary-rgb), 0.015),
     rgba(0, 0, 255, 0.01)
   );
   background-size: 100% 4px, 6px 100%;
   pointer-events: none;
+  transition: background 0.4s ease;
 }
 
-/* HUD glowing borders */
+/* HUD glowing borders & boxes with dynamic theme variables */
 .hud-box {
   position: relative;
-  border: 1px solid rgba(0, 240, 255, 0.25);
-  background: rgba(6, 15, 30, 0.7);
+  border: 1px solid var(--hud-border);
+  background: var(--hud-card-bg);
   backdrop-filter: blur(12px);
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.06), inset 0 0 15px rgba(0, 240, 255, 0.03);
+  box-shadow: 0 0 20px var(--hud-dim), inset 0 0 15px rgba(var(--hud-primary-rgb), 0.04);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease;
 }
 
 .hud-box-glow {
-  box-shadow: 0 0 25px rgba(0, 240, 255, 0.2), inset 0 0 15px rgba(0, 240, 255, 0.08);
+  box-shadow: 0 0 25px var(--hud-glow), inset 0 0 15px rgba(var(--hud-primary-rgb), 0.1);
 }
 
-/* HUD Corner accents */
+/* HUD Corner accents dynamically matching the theme color */
 .hud-corners::before,
 .hud-corners::after {
   content: '';
@@ -77,20 +88,50 @@
   width: 8px;
   height: 8px;
   pointer-events: none;
+  transition: border-color 0.4s ease;
 }
 
 .hud-corners::before {
   top: -1px;
   left: -1px;
-  border-top: 2px solid #00f0ff;
-  border-left: 2px solid #00f0ff;
+  border-top: 2px solid var(--hud-primary);
+  border-left: 2px solid var(--hud-primary);
 }
 
 .hud-corners::after {
   bottom: -1px;
   right: -1px;
-  border-bottom: 2px solid #00f0ff;
-  border-right: 2px solid #00f0ff;
+  border-bottom: 2px solid var(--hud-primary);
+  border-right: 2px solid var(--hud-primary);
+}
+
+/* Dynamic theme helper classes */
+.hud-text-primary {
+  color: var(--hud-primary);
+}
+
+.hud-border-primary {
+  border-color: var(--hud-primary);
+}
+
+.hud-border-dim {
+  border-color: var(--hud-border);
+}
+
+.hud-bg-dim {
+  background-color: var(--hud-accent-bg);
+}
+
+.hud-bg-card {
+  background-color: var(--hud-card-bg);
+}
+
+.hud-glow {
+  box-shadow: 0 0 15px var(--hud-glow);
+}
+
+.hud-drop-glow {
+  filter: drop-shadow(0 0 10px var(--hud-glow));
 }
 
 @keyframes spin-slow {
@@ -103,14 +144,14 @@
   to { transform: rotate(0deg); }
 }
 
-@keyframes pulse-cyan {
+@keyframes pulse-hud {
   0%, 100% {
     opacity: 0.8;
-    filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.6));
+    filter: drop-shadow(0 0 8px var(--hud-glow));
   }
   50% {
     opacity: 1;
-    filter: drop-shadow(0 0 22px rgba(0, 240, 255, 0.95));
+    filter: drop-shadow(0 0 22px var(--hud-glow));
   }
 }
 
@@ -126,6 +167,6 @@
   animation: spin-slow 6s linear infinite;
 }
 
-.animate-pulse-cyan {
-  animation: pulse-cyan 3s ease-in-out infinite;
+.animate-pulse-hud {
+  animation: pulse-hud 3s ease-in-out infinite;
 }

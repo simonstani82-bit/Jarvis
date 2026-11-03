@@ -1,6 +1,6 @@
 import React from 'react';
 import { JarvisStatus } from '../types/jarvis';
-import { Mic, MicOff, Volume2, Sparkles, AlertTriangle } from 'lucide-react';
+import { Mic, MicOff, Volume2 } from 'lucide-react';
 
 interface ArcReactorProps {
   status: JarvisStatus;
@@ -39,17 +39,17 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
   const getStatusColor = () => {
     switch (status) {
       case 'listening':
-        return 'text-amber-400 border-amber-400/60 shadow-amber-400/30';
+        return 'text-amber-400 border-amber-400/80 shadow-amber-400/40';
       case 'thinking':
       case 'planning':
       case 'executing_tool':
-        return 'text-cyan-300 border-cyan-400/80 shadow-cyan-400/40';
+        return 'text-[var(--hud-primary)] border-[var(--hud-primary)] shadow-[0_0_20px_var(--hud-glow)]';
       case 'speaking':
         return 'text-emerald-400 border-emerald-400/80 shadow-emerald-400/40';
       case 'awaiting_confirmation':
         return 'text-rose-400 border-rose-400/80 shadow-rose-400/40';
       default:
-        return 'text-cyan-400 border-cyan-500/40 shadow-cyan-500/20';
+        return 'text-[var(--hud-primary)] border-[var(--hud-border)] shadow-[0_0_12px_var(--hud-dim)]';
     }
   };
 
@@ -57,7 +57,7 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
 
   return (
     <div className="flex flex-col items-center justify-center p-4 relative select-none">
-      {/* Outer ambient glow */}
+      {/* Outer ambient glow reacting to dynamic theme */}
       <div
         className={`absolute w-56 h-56 rounded-full blur-3xl transition-all duration-700 pointer-events-none ${
           isListening
@@ -65,8 +65,8 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
             : isSpeaking
             ? 'bg-emerald-500/25 scale-125'
             : isWorking
-            ? 'bg-cyan-500/30 scale-120'
-            : 'bg-cyan-500/15'
+            ? 'bg-[var(--hud-primary)]/25 scale-120'
+            : 'bg-[var(--hud-primary)]/15'
         }`}
       />
 
@@ -84,7 +84,7 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
       >
         {/* Layer 1: Outermost dashed telemetry ring */}
         <div
-          className={`absolute inset-0 rounded-full border border-dashed border-cyan-500/30 transition-transform duration-1000 ${
+          className={`absolute inset-0 rounded-full border border-dashed border-[var(--hud-border)] transition-transform duration-1000 ${
             isListening || isWorking ? 'animate-spin-fast' : 'animate-spin-slow'
           }`}
           style={{ borderSpacing: '8px' }}
@@ -92,8 +92,10 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
 
         {/* Layer 2: Counter-rotating geometric segmented ring */}
         <div
-          className={`absolute inset-2 rounded-full border border-cyan-400/20 border-t-cyan-400/80 border-b-cyan-400/80 transition-all ${
-            isListening ? 'border-t-amber-400 border-b-amber-400 animate-spin-reverse' : 'animate-spin-reverse'
+          className={`absolute inset-2 rounded-full border border-[var(--hud-border)] border-t-[var(--hud-primary)] border-b-[var(--hud-primary)] transition-all ${
+            isListening
+              ? 'border-t-amber-400 border-b-amber-400 animate-spin-reverse'
+              : 'animate-spin-reverse'
           }`}
         />
 
@@ -110,8 +112,8 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
                   isListening
                     ? 'bg-amber-400/80 shadow-[0_0_6px_#f59e0b]'
                     : isWorking
-                    ? 'bg-cyan-300 shadow-[0_0_6px_#00f0ff]'
-                    : 'bg-cyan-500/40'
+                    ? 'bg-[var(--hud-primary)] shadow-[0_0_6px_var(--hud-primary)]'
+                    : 'bg-[var(--hud-border)]'
                 }`}
               />
             </div>
@@ -120,7 +122,7 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
 
         {/* Layer 4: Inner reactor core ring */}
         <div
-          className={`absolute inset-7 rounded-full border-2 transition-all duration-300 flex items-center justify-center bg-slate-950/80 backdrop-blur-md shadow-inner ${getStatusColor()}`}
+          className={`absolute inset-7 rounded-full border-2 transition-all duration-300 flex items-center justify-center bg-slate-950/85 backdrop-blur-md shadow-inner ${getStatusColor()}`}
         >
           {/* Audio Wave Frequency Bars */}
           <div className="flex items-center gap-1 h-12 px-2 pointer-events-none z-10">
@@ -137,14 +139,14 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
                       : isSpeaking
                       ? 'bg-emerald-400 shadow-[0_0_8px_#10b981]'
                       : isWorking
-                      ? 'bg-cyan-300 shadow-[0_0_8px_#00f0ff]'
-                      : 'bg-cyan-600/40'
+                      ? 'bg-[var(--hud-primary)] shadow-[0_0_8px_var(--hud-primary)]'
+                      : 'bg-[var(--hud-border)]'
                   }`}
                   style={{
                     height: animatedHeight,
                     animation:
                       isListening || isSpeaking || isWorking
-                        ? `pulse-cyan ${0.4 + (i % 3) * 0.2}s infinite alternate ease-in-out`
+                        ? `pulse-hud ${0.4 + (i % 3) * 0.2}s infinite alternate ease-in-out`
                         : 'none',
                   }}
                 />
@@ -159,7 +161,7 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
             ) : isListening ? (
               <MicOff className="w-8 h-8 text-amber-400 animate-bounce" />
             ) : (
-              <Mic className="w-8 h-8 text-cyan-400 transition-transform group-hover:scale-110" />
+              <Mic className="w-8 h-8 text-[var(--hud-primary)] transition-transform group-hover:scale-110" />
             )}
           </div>
         </div>
@@ -172,8 +174,8 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
               : isSpeaking
               ? 'bg-emerald-400/90 shadow-[0_0_18px_#10b981]'
               : isWorking
-              ? 'bg-cyan-300/90 shadow-[0_0_18px_#00f0ff]'
-              : 'bg-cyan-500/40 shadow-[0_0_10px_#00f0ff]'
+              ? 'bg-[var(--hud-primary)] shadow-[0_0_18px_var(--hud-primary)]'
+              : 'bg-[var(--hud-primary)]/50 shadow-[0_0_10px_var(--hud-primary)]'
           }`}
         />
       </div>
@@ -188,15 +190,15 @@ export const ArcReactor: React.FC<ArcReactorProps> = ({
                 : isSpeaking
                 ? 'bg-emerald-400'
                 : isWorking
-                ? 'bg-cyan-300'
-                : 'bg-cyan-500'
+                ? 'bg-[var(--hud-primary)]'
+                : 'bg-[var(--hud-primary)]'
             }`}
           />
-          <span className="hud-title text-xs tracking-widest font-bold text-cyan-200 uppercase">
+          <span className="hud-title text-xs tracking-widest font-bold text-slate-100 uppercase">
             {getStatusText()}
           </span>
         </div>
-        <p className="text-[11px] text-cyan-400/60 font-mono tracking-wider">
+        <p className="text-[11px] text-[var(--hud-primary)]/70 font-mono tracking-wider">
           MARK LXXXV // NEURAL INTERFACE
         </p>
       </div>

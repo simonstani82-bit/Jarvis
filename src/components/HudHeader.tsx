@@ -17,8 +17,10 @@ interface HudHeaderProps {
   voiceOutputActive: boolean;
   onToggleVoiceOutput: () => void;
   onToggleTelemetry: () => void;
+  onOpenSystemHealth: () => void;
   onResetChat: () => void;
   isTelemetryOpen: boolean;
+  isSystemHealthOpen?: boolean;
   memoryCount: number;
   currentTheme: HudTheme;
   onThemeChange: (theme: HudTheme) => void;
@@ -28,8 +30,10 @@ export const HudHeader: React.FC<HudHeaderProps> = ({
   voiceOutputActive,
   onToggleVoiceOutput,
   onToggleTelemetry,
+  onOpenSystemHealth,
   onResetChat,
   isTelemetryOpen,
+  isSystemHealthOpen = false,
   memoryCount,
   currentTheme,
   onThemeChange,
@@ -83,10 +87,17 @@ export const HudHeader: React.FC<HudHeaderProps> = ({
 
       {/* Center Telemetry Readout */}
       <div className="hidden lg:flex items-center gap-5 text-slate-300 text-[11px]">
-        <div className="flex items-center gap-1.5">
-          <Cpu className="w-3.5 h-3.5 text-[var(--hud-primary)]" />
-          <span>CORE: <strong className="text-[var(--hud-primary)] font-bold">100%</strong></span>
-        </div>
+        <button
+          onClick={() => {
+            soundEffects.playStartup();
+            onOpenSystemHealth();
+          }}
+          className="flex items-center gap-1.5 hover:text-[var(--hud-primary)] transition-colors cursor-pointer group"
+          title="D3 System Health Performance-Metriken öffnen"
+        >
+          <Cpu className="w-3.5 h-3.5 text-[var(--hud-primary)] group-hover:animate-pulse" />
+          <span>CORE: <strong className="text-[var(--hud-primary)] font-bold group-hover:underline">D3 HEALTH</strong></span>
+        </button>
         <div className="flex items-center gap-1.5">
           <Database className="w-3.5 h-3.5 text-[var(--hud-primary)]" />
           <span>GEDÄCHTNIS: <strong className="text-slate-100 font-bold">{memoryCount}</strong></span>
@@ -104,6 +115,23 @@ export const HudHeader: React.FC<HudHeaderProps> = ({
           currentTheme={currentTheme}
           onThemeChange={onThemeChange}
         />
+
+        {/* System Health Diagnostics Toggle Button */}
+        <button
+          onClick={() => {
+            soundEffects.playStartup();
+            onOpenSystemHealth();
+          }}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border transition-all ${
+            isSystemHealthOpen
+              ? 'border-emerald-400 bg-emerald-950/60 text-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+              : 'border-[var(--hud-border)] bg-[var(--hud-accent-bg)] text-[var(--hud-primary)] hover:border-[var(--hud-primary)]'
+          }`}
+          title="D3 System Health Diagnostic Suite"
+        >
+          <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+          <span className="hidden sm:inline text-[11px]">HEALTH</span>
+        </button>
 
         {/* Voice Speech Toggle */}
         <button

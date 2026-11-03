@@ -12,6 +12,8 @@ export type JarvisStatus =
   | 'speaking'
   | 'awaiting_confirmation';
 
+export type JarvisMood = 'normal' | 'thinking' | 'debugging' | 'speaking';
+
 export interface AgentStep {
   id: string;
   title: string;

@@ -90,6 +90,36 @@ class VoiceService {
     return this.mediaStream;
   }
 
+  public async checkPermission(): Promise<'granted' | 'prompt' | 'denied' | 'unsupported'> {
+    if (typeof navigator === 'undefined' || !navigator.permissions || !navigator.permissions.query) {
+      return 'unsupported';
+    }
+    try {
+      const status = await navigator.permissions.query({ name: 'microphone' as any });
+      return status.state;
+    } catch {
+      return 'unsupported';
+    }
+  }
+
+  /**
+   * Request microphone permission explicitly via user gesture
+   */
+  public async requestMicrophoneAccess(): Promise<boolean> {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      return false;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Keep tracks active briefly then store or release
+      this.mediaStream = stream;
+      return true;
+    } catch (e) {
+      console.warn('Microphone permission request rejected:', e);
+      return false;
+    }
+  }
+
   /**
    * Start listening using microphone MediaStream + optional SpeechRecognition.
    */
@@ -102,38 +132,102 @@ class VoiceService {
       this.stopSpeaking();
     }
 
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      onError('Mikrofonzugriff wird von diesem Browser nicht unterstützt.');
-      return;
-    }
-
     this.capturedTranscript = '';
     this.audioChunks = [];
+    let hasMediaStream = false;
+    let permDenied = false;
 
-    // 1. Request real microphone access via getUserMedia
-    try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-    } catch (err: any) {
+    // 1. Try requesting real microphone access via getUserMedia
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      try {
+        // First try with enhanced audio constraints
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        hasMediaStream = true;
+      } catch (err: any) {
+        console.warn('Primary getUserMedia attempt note:', err.name, err.message);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          permDenied = true;
+        } else {
+          // Try minimal constraint { audio: true }
+          try {
+            this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            hasMediaStream = true;
+          } catch (fallbackErr: any) {
+            console.warn('Minimal getUserMedia failed:', fallbackErr.name);
+            if (fallbackErr.name === 'NotAllowedError' || fallbackErr.name === 'PermissionDeniedError') {
+              permDenied = true;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. If getUserMedia was explicitly denied, do NOT try SpeechRecognition directly to prevent abrupt dual errors
+    if (!hasMediaStream) {
       this.isListening = false;
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      if (permDenied) {
         onError('Mikrofon-Berechtigung wurde verweigert. Bitte erlauben Sie den Mikrofonzugriff in den Browsereinstellungen für diese Seite.');
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        onError('Kein funktionierendes Mikrofon auf diesem System gefunden.');
+      } else if (this.recognition) {
+        // If not explicitly denied (e.g. no getUserMedia support), try speech recognition
+        try {
+          this.isListening = true;
+
+          this.recognition.onresult = (event: SpeechRecognitionEvent) => {
+            let interim = '';
+            let final = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+              const item = event.results[i][0];
+              if (event.results[i].isFinal) {
+                final += item.transcript;
+              } else {
+                interim += item.transcript;
+              }
+            }
+
+            const currentText = final || interim;
+            onResult(currentText, Boolean(final));
+          };
+
+          this.recognition.onerror = (event: any) => {
+            this.isListening = false;
+            console.warn('SpeechRecognition error:', event.error);
+            if (event.error === 'not-allowed') {
+              onError('Mikrofon-Berechtigung wurde verweigert. Bitte erlauben Sie den Mikrofonzugriff in den Browsereinstellungen für diese Seite.');
+            } else if (event.error === 'no-speech') {
+              onError('Keine Sprache erkannt. Bitte sprechen Sie deutlicher oder näher an das Mikrofon.');
+            } else {
+              onError(`Spracherkennungsfehler: ${event.error}`);
+            }
+            onEnd();
+          };
+
+          this.recognition.onend = () => {
+            this.isListening = false;
+            onEnd();
+          };
+
+          this.recognition.start();
+          return;
+        } catch (speechErr) {
+          console.warn('SpeechRecognition start failed:', speechErr);
+          onError('Mikrofon-Berechtigung wurde verweigert. Bitte erlauben Sie den Mikrofonzugriff in den Browsereinstellungen für diese Seite.');
+        }
       } else {
-        onError(`Mikrofon konnte nicht aktiviert werden: ${err.message || 'Unbekannter Fehler'}`);
+        onError('Kein Mikrofonzugriff möglich. Bitte überprüfen Sie Ihre Mikrofoneinstellungen.');
       }
       return;
     }
 
     this.isListening = true;
 
-    // 2. Setup MediaRecorder for fail-safe audio transcription via Gemini
+    // 3. Setup MediaRecorder for fail-safe audio transcription via Gemini
     try {
       let mimeType = 'audio/webm';
       if (!MediaRecorder.isTypeSupported('audio/webm')) {
@@ -147,8 +241,8 @@ class VoiceService {
       }
 
       const recorder = mimeType
-        ? new MediaRecorder(this.mediaStream, { mimeType })
-        : new MediaRecorder(this.mediaStream);
+        ? new MediaRecorder(this.mediaStream!, { mimeType })
+        : new MediaRecorder(this.mediaStream!);
 
       this.mediaRecorder = recorder;
       this.audioChunks = [];
@@ -214,7 +308,7 @@ class VoiceService {
       console.warn('MediaRecorder init warning:', e);
     }
 
-    // 3. Simultaneously start Web SpeechRecognition for instant live interim text (if supported)
+    // 4. Simultaneously start Web SpeechRecognition for instant live interim text (if supported)
     if (this.recognition) {
       try {
         this.recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -238,13 +332,11 @@ class VoiceService {
         };
 
         this.recognition.onerror = (event: any) => {
-          // Do not kill listening on standard minor errors ('no-speech', 'network' in iframes)
-          // because MediaRecorder continues recording in the background!
           console.warn('SpeechRecognition notification (MediaRecorder still recording):', event.error);
         };
 
         this.recognition.onend = () => {
-          // Don't kill listening if mediaRecorder is still recording
+          // Keep listening active while mediaRecorder records
         };
 
         this.recognition.start();
@@ -301,15 +393,91 @@ class VoiceService {
     });
   }
 
+  private phraseTimer: any = null;
+  private currentPhrases: string[] = [];
+  private currentPhraseIndex = 0;
+  private phraseListeners: ((phrase: string, index: number, total: number) => void)[] = [];
+
+  public addPhraseListener(listener: (phrase: string, index: number, total: number) => void): () => void {
+    this.phraseListeners.push(listener);
+    return () => {
+      this.phraseListeners = this.phraseListeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notifyPhrase(phrase: string, index: number, total: number) {
+    for (const listener of this.phraseListeners) {
+      try {
+        listener(phrase, index, total);
+      } catch (e) {
+        console.warn('Error in phrase listener:', e);
+      }
+    }
+  }
+
+  /**
+   * Splits spoken text into concise acoustic phrases (3-8 words or clause boundaries)
+   * optimal for floating HUD echo effects.
+   */
+  public splitIntoSpokenPhrases(text: string): string[] {
+    const clean = text
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/#+\s/g, '')
+      .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+      .replace(/https?:\/\/\S+/g, 'Link')
+      .replace(/["„“]/g, '')
+      .trim();
+
+    if (!clean) return [];
+
+    // Split at sentence boundaries (., !, ?, ;) or newlines
+    const rawSentences = clean.split(/(?<=[.!?;\n])\s+/);
+    const phrases: string[] = [];
+
+    for (const sentence of rawSentences) {
+      const s = sentence.trim();
+      if (!s) continue;
+
+      // If sentence has more than 8 words or exceeds 50 characters, break at comma/clause
+      const words = s.split(/\s+/);
+      if (words.length > 8 || s.length > 50) {
+        const subClauses = s.split(/(?<=[,–—])\s+/);
+        for (const clause of subClauses) {
+          const c = clause.trim();
+          if (!c) continue;
+          if (c.split(/\s+/).length > 8) {
+            // Chunk into smaller word segments
+            const cWords = c.split(/\s+/);
+            for (let i = 0; i < cWords.length; i += 6) {
+              const slice = cWords.slice(i, i + 6).join(' ');
+              if (slice.trim()) phrases.push(slice.trim());
+            }
+          } else {
+            phrases.push(c);
+          }
+        }
+      } else {
+        phrases.push(s);
+      }
+    }
+
+    return phrases.length > 0 ? phrases : [clean];
+  }
+
   public speak(
     text: string,
     onStart?: () => void,
-    onEnd?: () => void
+    onEnd?: () => void,
+    onPhrase?: (phrase: string, index: number, total: number) => void
   ) {
     if (!this.voiceEnabled || !this.isSynthesisSupported()) {
       if (onEnd) onEnd();
       return;
     }
+
+    this.stopSpeaking();
 
     const cleanText = text
       .replace(/```[\s\S]*?```/g, 'Codeblock ausgelassen.')
@@ -335,18 +503,73 @@ class VoiceService {
       utterance.voice = deVoice;
     }
 
+    // Prepare phrases for real-time speech echo layer
+    const phrases = this.splitIntoSpokenPhrases(cleanText);
+    this.currentPhrases = phrases;
+    this.currentPhraseIndex = 0;
+
+    const scheduleNextPhrase = (index: number) => {
+      if (!this.isSpeaking || index >= phrases.length) return;
+      const current = phrases[index];
+      this.currentPhraseIndex = index;
+      
+      if (onPhrase) onPhrase(current, index, phrases.length);
+      this.notifyPhrase(current, index, phrases.length);
+
+      // Estimate duration based on word count (~240ms per word + base 600ms)
+      const wordCount = current.split(/\s+/).length;
+      const estimatedMs = Math.max(1200, Math.min(4200, wordCount * 250 + 600));
+
+      if (index + 1 < phrases.length) {
+        this.phraseTimer = setTimeout(() => {
+          scheduleNextPhrase(index + 1);
+        }, estimatedMs);
+      }
+    };
+
     utterance.onstart = () => {
       this.isSpeaking = true;
       if (onStart) onStart();
+      if (phrases.length > 0) {
+        scheduleNextPhrase(0);
+      }
+    };
+
+    // Use boundary event if supported by browser for pinpoint synchronicity
+    utterance.onboundary = (event: SpeechSynthesisEvent) => {
+      if (event.name === 'sentence' || (event.name === 'word' && phrases.length > 1)) {
+        // Find which phrase corresponds to the current charIndex
+        let cumulativeChars = 0;
+        for (let i = 0; i < phrases.length; i++) {
+          cumulativeChars += phrases[i].length + 1;
+          if (event.charIndex <= cumulativeChars) {
+            if (i !== this.currentPhraseIndex) {
+              this.currentPhraseIndex = i;
+              const p = phrases[i];
+              if (onPhrase) onPhrase(p, i, phrases.length);
+              this.notifyPhrase(p, i, phrases.length);
+            }
+            break;
+          }
+        }
+      }
     };
 
     utterance.onend = () => {
       this.isSpeaking = false;
+      if (this.phraseTimer) {
+        clearTimeout(this.phraseTimer);
+        this.phraseTimer = null;
+      }
       if (onEnd) onEnd();
     };
 
     utterance.onerror = () => {
       this.isSpeaking = false;
+      if (this.phraseTimer) {
+        clearTimeout(this.phraseTimer);
+        this.phraseTimer = null;
+      }
       if (onEnd) onEnd();
     };
 
@@ -354,10 +577,14 @@ class VoiceService {
   }
 
   public stopSpeaking() {
+    if (this.phraseTimer) {
+      clearTimeout(this.phraseTimer);
+      this.phraseTimer = null;
+    }
     if (this.isSynthesisSupported()) {
       window.speechSynthesis.cancel();
-      this.isSpeaking = false;
     }
+    this.isSpeaking = false;
   }
 }
 

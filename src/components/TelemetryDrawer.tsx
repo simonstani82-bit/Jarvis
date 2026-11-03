@@ -18,11 +18,12 @@ import {
 } from '../types/jarvis';
 import { soundEffects } from '../services/soundEffects';
 import { HUD_THEMES, HudTheme, themeService } from '../services/themeService';
-import { DiagnosticsChart } from './DiagnosticsChart';
+import { SystemHealthWidget } from './SystemHealthWidget';
 
 interface TelemetryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: 'memory' | 'calendar' | 'notes' | 'system';
   memories: MemoryItem[];
   calendarEvents: CalendarEvent[];
   notes: NoteItem[];
@@ -42,6 +43,7 @@ interface TelemetryDrawerProps {
 export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
   isOpen,
   onClose,
+  initialTab = 'memory',
   memories,
   calendarEvents,
   notes,
@@ -57,7 +59,13 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
   onToggleNote,
   onDeleteNote,
 }) => {
-  const [activeTab, setActiveTab] = useState<'memory' | 'calendar' | 'notes' | 'system'>('memory');
+  const [activeTab, setActiveTab] = useState<'memory' | 'calendar' | 'notes' | 'system'>(initialTab);
+
+  React.useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Local form states
   const [newMemKey, setNewMemKey] = useState('');
@@ -372,8 +380,8 @@ export const TelemetryDrawer: React.FC<TelemetryDrawerProps> = ({
           {/* TAB 4: SYSTEM DIAGNOSTICS & THEMES */}
           {activeTab === 'system' && (
             <div className="space-y-4 font-mono text-xs">
-              {/* Real-time System Diagnostics Recharts Widget */}
-              <DiagnosticsChart
+              {/* Real-time System Health D3.js Widget */}
+              <SystemHealthWidget
                 currentTheme={currentTheme}
                 isWorking={isWorking}
               />
